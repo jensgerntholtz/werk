@@ -19,7 +19,9 @@
     "test:watch": "vitest",
     "typecheck": "pnpm -r --if-present run typecheck",
     "dev": "pnpm --filter @werk/sandbox dev",
-    "preview": "pnpm --filter @werk/sandbox preview"
+    "preview": "pnpm --filter @werk/sandbox preview",
+    "probe": "node sandbox/probe/run.mjs",
+    "probe:check": "node sandbox/probe/check.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",

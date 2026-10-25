@@ -2,15 +2,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { createYieldNow } from '../src/yield'
 
 describe('createYieldNow', () => {
-  it('prefers scheduler.yield and passes the default priority', async () => {
+  it('prefers scheduler.postTask and passes the default priority', async () => {
     const scheduleYield = vi.fn(async () => {})
     const postTask = vi.fn(async () => {})
     const yieldNow = createYieldNow({ yield: scheduleYield, postTask })
 
     await yieldNow()
 
-    expect(scheduleYield).toHaveBeenCalledWith({ priority: 'user-visible' })
-    expect(postTask).not.toHaveBeenCalled()
+    expect(postTask).toHaveBeenCalledWith(expect.any(Function), { priority: 'user-visible' })
+    expect(scheduleYield).not.toHaveBeenCalled()
+  })
+
+  it('falls back to scheduler.yield when postTask is unavailable', async () => {
+    const scheduleYield = vi.fn(async () => {})
+    const yieldNow = createYieldNow({ yield: scheduleYield })
+
+    await yieldNow({ priority: 'background' })
+
+    expect(scheduleYield).toHaveBeenCalledWith({ priority: 'background' })
   })
 
   it('uses scheduler.postTask when yield is unavailable', async () => {

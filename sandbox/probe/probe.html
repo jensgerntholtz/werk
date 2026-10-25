@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>werk budget probe</title>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <script type="module">
+      import { runProbe } from './probe.ts'
+
+      const params = new URLSearchParams(location.search)
+      const result = await runProbe({
+        records: Number(params.get('records') ?? 600_000),
+        budgetMs: Number(params.get('budgetMs') ?? 5),
+        query: params.get('query') ?? 'sil',
+        limit: Number(params.get('limit') ?? 100),
+        transport: params.get('transport') ?? 'auto',
+      })
+      window.__PROBE_RESULT__ = result
+      document.getElementById('out').textContent = JSON.stringify(result, null, 2)
+    </script>
+  </body>
+</html>

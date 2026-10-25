@@ -33,8 +33,8 @@ application code
  werk.task / werk.effect / werk.ingest
       |
       v
- Budget loop  --->  yieldNow()  --->  scheduler.yield
-      |                                scheduler.postTask
+ Budget loop  --->  yieldNow()  --->  scheduler.postTask
+      |                                scheduler.yield (fallback)
       |                                MessageChannel
       v                                setTimeout
  Vue refs (data, pending, error, status)
@@ -58,6 +58,11 @@ The budget is a cooperative instrument, not a preemption mechanism. The runtime 
 JavaScript elapsed with `performance.now()`, checks after units, and yields when the slice is
 spent. A single unit that overruns is a contract violation and should be moved to a worker, split,
 or explicitly accepted as outside werk's boundary.
+
+The budget bounds a slice, not a frame. At 60 Hz a frame is 16.7 ms and werk can fit several slices
+into it, so diagnostics measure slice time and frame gaps separately. A GC or JIT pause inside a
+slice is a real overrun that diagnostics surface; it is not the loop checking the budget too
+rarely.
 
 ### Vue boundary
 

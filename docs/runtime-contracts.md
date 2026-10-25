@@ -24,10 +24,20 @@ The key words MUST, MUST NOT, SHOULD, and MAY are used in the RFC 2119 sense.
 
 - The budget measures JavaScript elapsed via `performance.now()`. It MUST NOT include time spent
   waiting for a yield.
+- The budget bounds a **slice** — the work between two yields. It does NOT bound a frame: at 60 Hz
+  one frame is 16.7 ms and several slices may run inside it. Diagnostics MUST report slice time
+  separately from frame gaps, because a probe that compares a 5 ms budget to a 16.7 ms frame
+  misreports a healthy run as an overrun.
+- A pause the runtime does not control (a GC or JIT pause inside a slice) is still main-thread
+  elapsed and counts against the slice. Diagnostics SHOULD surface such overruns rather than hide
+  them, and SHOULD NOT attribute them to the budget loop.
 - A single atomic unit that exceeds the budget is a violation. The runtime cannot preempt it. The
   developer MUST split it or escalate the whole unit to a worker.
-- Yield preference: `scheduler.yield()` → `scheduler.postTask()` → `MessageChannel` →
-  `setTimeout(0)`. The chosen adapter SHOULD be observable for diagnostics.
+- Yield preference: `scheduler.postTask()` → `scheduler.yield()` → `MessageChannel` →
+  `setTimeout(0)`. `scheduler.yield()` MUST NOT be the default adapter: current Chromium reschedules
+  its continuation ahead of rendering, which starves frames under a small budget even though no
+  single task exceeds the Long Tasks threshold. The chosen adapter SHOULD be observable for
+  diagnostics.
 - `yieldNow()` MUST reject with an `AbortError` when the task signal is aborted, so cooperative
   loops can exit without a second check after every yield.
 
@@ -39,7 +49,10 @@ Progress is a declared capability, not a universal promise.
   (`{ kind: 'determinate', completed, total }`).
 - An opaque task MUST report indeterminate progress plus liveness (`{ kind: 'indeterminate',
   lastActivityAt }`). It MUST NOT fabricate a percentage.
-- Publishing SHOULD be coalesced to roughly 4–10 Hz. It MUST NOT publish on every chunk.
+- Publishing MUST be coalesced to roughly 4–10 Hz, and the latest value MUST be flushed when the
+  task settles (success, error, or cancellation) so a final 100% is never dropped. It MUST NOT
+  publish on every chunk or slice: one reactive write per slice forces a component re-render per
+  slice and costs more than the budget protects.
 - Transport preference:
   1. `SharedArrayBuffer` + `Atomics`, read on `requestAnimationFrame` with zero clone.
   2. Coalesced structured messages at 4–10 Hz.

@@ -9,3 +9,6 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local probe output
+sandbox/probe/*.png

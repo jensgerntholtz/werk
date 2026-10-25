@@ -3,6 +3,7 @@ import { createBudget } from './budget.js'
 import { createTaskContext } from './context.js'
 import { isAbortError, throwIfAborted } from './errors.js'
 import type { Runtime } from './internal.js'
+import { createProgressPublisher } from './progress.js'
 import type { TaskFn, TaskHandle, TaskOptions, TaskProgress, TaskStatus } from './types.js'
 
 export function createTask<T>(
@@ -40,9 +41,12 @@ export function createTask<T>(
     progress.value = null
 
     const budget = createBudget(options.budgetMs ?? runtime.budgetMs, runtime.now)
+    const publisher = createProgressPublisher((next) => {
+      progress.value = next
+    }, runtime.now)
     const report = (next: TaskProgress): void => {
       if (token === runToken && !signal.aborted) {
-        progress.value = next
+        publisher.publish(next)
       }
     }
     const context = createTaskContext(runtime, signal, budget, report)
@@ -73,6 +77,7 @@ export function createTask<T>(
       throw cause
     } finally {
       if (token === runToken) {
+        if (!signal.aborted) publisher.flush()
         pending.value = false
         controller = null
       }

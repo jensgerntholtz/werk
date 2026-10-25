@@ -9,13 +9,19 @@ previous one shipped — they start when the previous one is proven in a real ap
 browser-specific scheduler tests remain.
 
 - Budget scheduler with a configurable `budgetMs` (default 5 ms). **Landed.**
-- Cooperative yielding with `scheduler.yield` / `scheduler.postTask` fallbacks. **Landed.**
+- Cooperative yielding with postTask-first scheduling and `scheduler.yield` / `MessageChannel`
+  fallbacks. **Landed.**
 - `werk.effect`, `werk.task`, `werk.ingest`. **Landed.**
 - Explicit async boundary: `shallowRef` data plus pending/error/status/progress. **Landed.**
 - Cancellation semantics, including late-chunk discard. **Landed.**
 - Test injection for clock and yield adapter. **Landed.**
-- Sandbox with a heavy fuzzy search and budgeted ingestion. **Landed.**
-- Browser-level scheduler fallback tests and a production-style app case. **Remaining.**
+- Progress publishing coalesced to ~10 Hz with a final flush. **Landed.**
+- Sandbox with a heavy fuzzy search and budgeted ingestion, reporting worst slice and worst frame
+  separately. **Landed.**
+- A zero-dependency real-Chrome probe (`pnpm probe:check`) that measures slices directly across
+  every yield transport. **Landed as a manual tool.**
+- CI-level automated browser test (the probe needs a local Chrome) and a production-style app case.
+  **Remaining.**
 
 **Exit criteria:** one real compute-heavy app uses it; no werk-managed slice intentionally exceeds
 the budget; tests cover budget, yield fallbacks, cancellation, and ingestion.

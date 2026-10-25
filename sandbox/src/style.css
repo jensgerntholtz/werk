@@ -454,6 +454,40 @@ input[type="search"]:focus {
   background: linear-gradient(90deg, #d96363, #ff8a8a);
 }
 
+.over-budget {
+  color: #f4b45e;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  margin-left: 0.3rem;
+  text-transform: uppercase;
+}
+
+.slice-meter {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.slice-meter-label {
+  color: #5f6d83;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.meter.slice {
+  height: 0.22rem;
+  background: rgba(148, 166, 199, 0.1);
+}
+
+.meter.slice > span {
+  background: linear-gradient(90deg, #47c98a, #61d99c);
+}
+
+.meter.slice.over > span {
+  background: linear-gradient(90deg, #f4b45e, #ff8a8a);
+}
+
 .comparison-note {
   color: #5f6d83;
   font-size: 0.68rem;
@@ -609,6 +643,89 @@ input[type="search"]:focus {
 .status.fail {
   background: rgba(255, 115, 115, 0.1);
   color: #ffadad;
+}
+
+.dials {
+  margin-bottom: 1.25rem;
+}
+
+.dial-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1.1rem 1.35rem;
+}
+
+.dial {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.dial-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dial-label {
+  color: #75839a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.dial-value {
+  color: #dfe7f7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dial input[type="range"] {
+  width: 100%;
+  height: 1.1rem;
+  margin: 0;
+  accent-color: #708cff;
+  cursor: pointer;
+}
+
+.dial input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.dial-hint {
+  color: #5f6d83;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.dial-progress {
+  margin: 1rem 0 0;
+}
+
+.transport-dial {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.1rem;
+}
+
+.transport-switch {
+  max-width: 30rem;
+  margin-bottom: 0;
+}
+
+.dial-footnote {
+  color: #5f6d83;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  margin: 0.9rem 0 0;
+}
+
+.dial-footnote span {
+  color: #8394b0;
 }
 
 .footer {

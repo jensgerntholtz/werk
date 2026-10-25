@@ -10,19 +10,30 @@
 
 Werk is built around one invariant: no werk-managed task runs longer than a small JavaScript
 budget (roughly 5–8 ms) before yielding, leaving headroom for style, layout, paint, and the
-browser's own work. It does not make Vue's rendering, third-party scripts, or garbage collection
-free. It owns the work that crosses its boundary and shows everything else in the inspector.
+browser's own work. The budget bounds **werk's work between two yields** (a slice). It does not
+bound a frame: at 60 Hz one frame is 16.7 ms and werk can run several slices inside it. It also does
+not make Vue's rendering, third-party scripts, or garbage collection free — a GC pause inside a
+slice shows up as an overrun and is surfaced rather than hidden.
 
 ## Implemented today
 
 - `werk.task` — `shallowRef` data plus pending/error/status/progress refs, latest-run-wins
   cancellation, and an explicit async boundary.
 - `werk.effect` — the async watch-callback pattern with budget helpers.
-- `werk.ingest` — applies iterables to Vue state in bounded batches with cooperative yields.
-- 5 ms default budget with `scheduler.yield()` → `scheduler.postTask()` → `MessageChannel`
-  fallbacks; `yieldNow()` resets the budget on resume.
+- `werk.ingest` — applies iterables to Vue state in bounded batches with cooperative yields. Batch
+  boundaries are flushed for atomicity but only the budget forces a yield, so an ingest is not
+  punished for small batches.
+- Progress publishes are coalesced to ~10 Hz (with a final flush) instead of one reactive write per
+  slice, so a running task does not re-render the application every 5 ms.
+- 5 ms default budget with postTask-first yielding (`scheduler.postTask()` → `scheduler.yield()` →
+  `MessageChannel` → `setTimeout`); `yieldNow()` resets the budget on resume.
 - A Vue sandbox that demonstrates cooperative fuzzy search and budgeted ingestion, with a
-  Werk Only / Werk Off / Werk Compare switch and a Long Tasks A/B panel.
+  Werk Only / Werk Off / Werk Compare switch, a Long Tasks A/B panel, and dials for the slice
+  budget, catalogue size, result limit, ingest row/batch sizes, and yield transport. Each run
+  reports **worst frame** next to **worst slice**: at 600,000 records and a 5 ms budget the
+  postTask-first default holds a p95 slice at ~5 ms and a 16.7 ms worst frame (one 60 Hz refresh,
+  so no dropped frames), while forcing `scheduler.yield()` reports a 100–117 ms worst frame for the
+  same work. The sandbox probe ships that comparison as a browser check.
 
 Not implemented yet: worker backend, progress transports, backpressure, route/session scopes,
 visibility throttling, adaptive chunk sizing, and the entire build layer.
@@ -36,7 +47,7 @@ Werk is not one framework. It is two products that can be adopted separately.
 One scheduler, three backends:
 
 - **Cooperative yielding (default)** — stay on the main thread and yield between units with
-  `scheduler.yield()` / `scheduler.postTask()`. No serialization, no cold start, reactivity
+  `scheduler.postTask()` / `scheduler.yield()`. No serialization, no cold start, reactivity
   intact between units.
 - **Workers (escalation)** — only for a single non-decomposable CPU unit that blows the budget:
   parsing, large sorts, tokenizers. Tagged explicitly by the developer.
@@ -93,6 +104,7 @@ pnpm dev         # sandbox at http://localhost:5180
 pnpm check       # Biome
 pnpm typecheck   # core tsc -b + sandbox vue-tsc
 pnpm test        # Vitest
+pnpm probe:check # real-Chrome slice/frame check for every yield transport (needs pnpm dev)
 pnpm build       # core + sandbox production builds
 ```
 

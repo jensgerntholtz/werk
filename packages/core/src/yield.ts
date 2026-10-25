@@ -11,20 +11,25 @@ const DEFAULT_PRIORITY: SchedulerPriority = 'user-visible'
 export function createYieldNow(scheduler?: SchedulerLike): YieldFn {
   const activeScheduler = scheduler ?? (globalThis as { scheduler?: SchedulerLike }).scheduler
 
-  if (activeScheduler?.yield) {
-    const scheduleYield = activeScheduler.yield.bind(activeScheduler)
-    return async (options) => {
-      throwIfAborted(options?.signal)
-      await scheduleYield({ priority: options?.priority ?? DEFAULT_PRIORITY })
-      throwIfAborted(options?.signal)
-    }
-  }
-
+  // postTask hands the thread back to the event loop, so the renderer can produce frames between
+  // slices. scheduler.yield() reschedules its continuation ahead of rendering in current Chromium:
+  // with a 5 ms budget it starves frames for ~100 ms at a time even though no task exceeds 50 ms
+  // (Long Tasks stays 0 while worst frame is 117 ms). Keep it only for explicitly injected
+  // schedulers and for browsers that expose yield without postTask.
   if (activeScheduler?.postTask) {
     const postTask = activeScheduler.postTask.bind(activeScheduler)
     return async (options) => {
       throwIfAborted(options?.signal)
       await postTask(() => {}, { priority: options?.priority ?? DEFAULT_PRIORITY })
+      throwIfAborted(options?.signal)
+    }
+  }
+
+  if (activeScheduler?.yield) {
+    const scheduleYield = activeScheduler.yield.bind(activeScheduler)
+    return async (options) => {
+      throwIfAborted(options?.signal)
+      await scheduleYield({ priority: options?.priority ?? DEFAULT_PRIORITY })
       throwIfAborted(options?.signal)
     }
   }

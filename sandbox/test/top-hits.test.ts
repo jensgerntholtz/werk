@@ -36,4 +36,17 @@ describe('TopHits', () => {
     expect(() => new TopHits<Hit>(0)).toThrow(RangeError)
     expect(() => new TopHits<Hit>(1.5)).toThrow(RangeError)
   })
+
+  it('reports whether a score would enter the heap', () => {
+    const top = new TopHits<Hit>(2)
+
+    expect(top.wouldAccept(1)).toBe(true)
+
+    top.add({ name: 'five', score: 5 })
+    top.add({ name: 'three', score: 3 })
+
+    expect(top.wouldAccept(2)).toBe(false)
+    expect(top.wouldAccept(3)).toBe(false)
+    expect(top.wouldAccept(4)).toBe(true)
+  })
 })

@@ -172,10 +172,23 @@ function pick<T>(values: readonly T[], random: () => number): T {
   return value
 }
 
-function buildCatalog(count: number): CatalogEntry[] {
+export const DEFAULT_CATALOG_SIZE = 600_000
+
+/**
+ * Generates the catalogue lazily so the sandbox can build it in cooperative slices and at a
+ * user-chosen size instead of blocking the first paint with a 600,000-record array.
+ *
+ * The generator is seeded and deterministic: any prefix of `catalogEntries(n)` is identical for
+ * every larger `n`, so changing the record dial never reshuffles existing records.
+ */
+export function* catalogEntries(count: number): Generator<CatalogEntry> {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new RangeError(`count must be a non-negative integer, received ${String(count)}`)
+  }
+
   const random = mulberry32(0x5eed)
 
-  return Array.from({ length: count }, (_, id) => {
+  for (let id = 0; id < count; id += 1) {
     const adjective = pick(ADJECTIVES, random)
     const noun = pick(NOUNS, random)
     const suffix = random() > 0.7 ? ` ${pick(NUMERALS, random)}` : ''
@@ -226,12 +239,14 @@ function buildCatalog(count: number): CatalogEntry[] {
       .join(' ')
       .toLowerCase()
 
-    return entry
-  })
+    yield entry
+  }
 }
 
-export const CATALOG: readonly CatalogEntry[] = buildCatalog(600_000)
-export const CATALOG_SIZE = CATALOG.length
+/** Synchronous convenience build for tests and one-shot scripts. */
+export function buildCatalog(count: number): CatalogEntry[] {
+  return [...catalogEntries(count)]
+}
 
 export function fuzzyScore(text: string, query: string): number {
   let queryIndex = 0
@@ -265,14 +280,19 @@ export function scoreEntry(entry: CatalogEntry, normalizedQuery: string): number
   return base + title * 3 + summary + titleBoost
 }
 
-export function searchCatalog(query: string, limit = 100): SearchResult {
+/** Blocking baseline: scans everything and sorts the full match set in one task. */
+export function searchCatalog(
+  query: string,
+  limit: number,
+  catalog: readonly CatalogEntry[],
+): SearchResult {
   const normalized = query.trim().toLowerCase()
   if (normalized.length === 0) {
     return { hits: [], totalMatches: 0 }
   }
 
   const found: SearchHit[] = []
-  for (const entry of CATALOG) {
+  for (const entry of catalog) {
     const score = scoreEntry(entry, normalized)
     if (score > 0) {
       found.push({ entry, score })

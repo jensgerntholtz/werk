@@ -45,6 +45,7 @@ does not yet support TypeScript 7's package layout; core and the repository stay
 The cooperative runtime v0 is implemented in `packages/core`: budget, yielding, `werk.task`,
 `werk.effect`, `werk.ingest`, cancellation, and progress refs. `sandbox/` exercises it.
 
-The next slice is browser scheduler coverage, worker escalation, transport/backpressure, and the
-build layer. The worker, route-scope, visibility, and adaptive-sizing contracts are documented but
+Slice/frame diagnostics and a real-Chrome budget probe across every yield transport have landed;
+automating that probe in CI, worker escalation, transport/backpressure, and the build layer are the
+next slices. The worker, route-scope, visibility, and adaptive-sizing contracts are documented but
 not implemented.

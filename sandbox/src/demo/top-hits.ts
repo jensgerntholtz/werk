@@ -17,7 +17,22 @@ export class TopHits<T extends Scored> {
     }
   }
 
+  /**
+   * Returns whether a hit with this score would enter the heap.
+   *
+   * Lets hot scan loops skip allocating a hit object for the overwhelming majority of matches
+   * that cannot make the top-K cut. Allocating one object per match is the difference between a
+   * quiet scan and a major-GC stall in the middle of a run.
+   */
+  wouldAccept(score: number): boolean {
+    if (this.heap.length < this.limit) return true
+    const root = this.heap[0]
+    return root !== undefined && score > root.score
+  }
+
   add(hit: T): void {
+    if (!this.wouldAccept(hit.score)) return
+
     const heap = this.heap
 
     if (heap.length < this.limit) {
@@ -25,9 +40,6 @@ export class TopHits<T extends Scored> {
       this.bubbleUp(heap.length - 1)
       return
     }
-
-    const root = heap[0]
-    if (root !== undefined && hit.score <= root.score) return
 
     heap[0] = hit
     this.sinkDown(0)
