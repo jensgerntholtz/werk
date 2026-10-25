@@ -230,7 +230,7 @@ function buildCatalog(count: number): CatalogEntry[] {
   })
 }
 
-export const CATALOG: readonly CatalogEntry[] = buildCatalog(60_000)
+export const CATALOG: readonly CatalogEntry[] = buildCatalog(600_000)
 export const CATALOG_SIZE = CATALOG.length
 
 export function fuzzyScore(text: string, query: string): number {

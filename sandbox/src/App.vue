@@ -12,6 +12,7 @@ import {
 } from './demo/catalog'
 import { measureMainThread, type RunMetrics } from './demo/measure'
 import { type DemoRow, makeRows } from './demo/rows'
+import { TopHits } from './demo/top-hits'
 
 type Mode = 'only' | 'off' | 'compare'
 
@@ -54,16 +55,18 @@ const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, re
     return { hits: [], totalMatches: 0 }
   }
 
-  const found: SearchHit[] = []
+  const top = new TopHits<SearchHit>(SEARCH_LIMIT)
   let processed = 0
   let yields = 0
+  let totalMatches = 0
 
   for (const entry of CATALOG) {
     if (signal.aborted) break
 
     const score = scoreEntry(entry, normalized)
     if (score > 0) {
-      found.push({ entry, score })
+      top.add({ entry, score })
+      totalMatches += 1
     }
     processed += 1
 
@@ -76,8 +79,7 @@ const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, re
 
   werkYields.value = yields
   reportProgress(CATALOG_SIZE, CATALOG_SIZE)
-  found.sort((left, right) => right.score - left.score)
-  return { hits: found.slice(0, SEARCH_LIMIT), totalMatches: found.length }
+  return { hits: top.sorted(), totalMatches }
 })
 
 const currentModeLabel = computed(

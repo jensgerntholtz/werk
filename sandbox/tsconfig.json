@@ -17,6 +17,6 @@
       "@werk/core": ["../packages/core/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.vue", "src/**/*.d.ts", "test/**/*.ts"],
   "exclude": ["dist"]
 }

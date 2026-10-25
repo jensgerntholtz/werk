@@ -17,9 +17,10 @@ hot-reload without rebuilding the package.
 
 ## What to look at
 
-**Fuzzy search.** Searches 60,000 deterministically generated nested catalogue records. The query
+**Fuzzy search.** Searches 600,000 deterministically generated nested catalogue records. The query
 is scored as a subsequence across title, author, tags, and summary. The work runs through
-`werk.task` with a 5 ms budget, progress refs, and latest-run-wins cancellation.
+`werk.task` with a 5 ms budget, progress refs, and latest-run-wins cancellation. Results use a
+bounded top-100 heap, so the cooperative path never sorts the full 590k-match set in one task.
 
 - Switch between **Werk Only**, **Werk Off**, and **Werk Compare**. The switch controls both the run
   button and the automatic rerun when the query changes.
