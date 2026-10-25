@@ -39,6 +39,7 @@ const ROW_COUNT = rowsSource.length
 
 const mode = ref<Mode>('compare')
 const modeRunning = ref(false)
+const rerunQueued = ref(false)
 const runState = shallowRef<RunState | null>(null)
 const query = ref('sil')
 const result = shallowRef<SearchResult | null>(null)
@@ -158,6 +159,7 @@ async function measureOn(): Promise<RunMetrics> {
 async function runMode(): Promise<void> {
   if (modeRunning.value) return
 
+  window.clearTimeout(debounceTimer)
   modeRunning.value = true
   const activeMode = mode.value
   const queryAtStart = query.value
@@ -197,6 +199,10 @@ async function runMode(): Promise<void> {
   } finally {
     blocking.value = false
     modeRunning.value = false
+    if (rerunQueued.value) {
+      rerunQueued.value = false
+      void runMode()
+    }
   }
 }
 
@@ -282,9 +288,12 @@ let debounceTimer: ReturnType<typeof setTimeout> | undefined
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 
 watch(query, () => {
-  if (modeRunning.value) return
   window.clearTimeout(debounceTimer)
   debounceTimer = window.setTimeout(() => {
+    if (modeRunning.value) {
+      rerunQueued.value = true
+      return
+    }
     void runMode()
   }, 150)
 })
@@ -355,7 +364,9 @@ onBeforeUnmount(() => {
             {{ option.label }}
           </button>
         </div>
-        <p class="mode-note">{{ modeNote }}</p>
+        <p class="mode-note">
+          {{ rerunQueued ? 'Query changed — another run is queued.' : modeNote }}
+        </p>
 
         <label class="field">
           <span>Query</span>
@@ -365,7 +376,6 @@ onBeforeUnmount(() => {
             placeholder="Try “sil”, “atlas”, or “glass”"
             autocomplete="off"
             spellcheck="false"
-            :disabled="modeRunning"
           />
         </label>
 

@@ -27,6 +27,7 @@ is scored as a subsequence across title, author, tags, and summary. The work run
   - **Werk Off** runs the same search synchronously.
   - **Werk Compare** runs both back to back and shows an A/B panel.
 - Each run reports total time, long tasks over 50 ms, longest task, and cooperative yields.
+- The query stays editable while a run is in flight. If it changes, the next run is queued.
 - The UI heartbeat freezes during werk-off. Total time is not the point; the difference is whether
   the browser gets the main thread back between slices.
 
