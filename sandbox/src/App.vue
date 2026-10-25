@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { werk } from '@werk/core'
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import FrameTimeChart from './components/FrameTimeChart.vue'
 import {
   CATALOG,
   CATALOG_SIZE,
@@ -43,7 +44,6 @@ const rerunQueued = ref(false)
 const runState = shallowRef<RunState | null>(null)
 const query = ref('sil')
 const result = shallowRef<SearchResult | null>(null)
-const heartbeat = ref(0)
 const blocking = ref(false)
 const werkYields = ref(0)
 
@@ -285,7 +285,6 @@ function formatMs(value: number | null): string {
 }
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
-let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 
 watch(query, () => {
   window.clearTimeout(debounceTimer)
@@ -299,15 +298,11 @@ watch(query, () => {
 })
 
 onMounted(() => {
-  heartbeatTimer = window.setInterval(() => {
-    heartbeat.value += 1
-  }, 50)
   void runMode()
 })
 
 onBeforeUnmount(() => {
   window.clearTimeout(debounceTimer)
-  window.clearInterval(heartbeatTimer)
   ingestController?.abort()
   searchTask.cancel()
 })
@@ -385,12 +380,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <div class="heartbeat" :class="{ paused: blocking }">
-          <span class="pulse"></span>
-          <span>UI heartbeat</span>
-          <strong>{{ heartbeat }}</strong>
-          <span class="muted">50 ms interval</span>
-        </div>
+        <FrameTimeChart />
 
         <div
           v-if="modeRunning || (searchPercent !== null && mode !== 'off')"

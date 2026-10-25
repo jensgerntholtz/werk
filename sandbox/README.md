@@ -28,8 +28,8 @@ is scored as a subsequence across title, author, tags, and summary. The work run
   - **Werk Compare** runs both back to back and shows an A/B panel.
 - Each run reports total time, long tasks over 50 ms, longest task, and cooperative yields.
 - The query stays editable while a run is in flight. If it changes, the next run is queued.
-- The UI heartbeat freezes during werk-off. Total time is not the point; the difference is whether
-  the browser gets the main thread back between slices.
+- The frame-time chart tracks recent `requestAnimationFrame` gaps on a fixed 0–50 ms scale. During
+  werk-off the chart stalls and then shows the long frame; werk-on keeps drawing.
 
 The comparison uses the browser's `PerformanceObserver` Long Tasks API (Chromium-based browsers).
 Werk-on should report zero long tasks while yielding; werk-off reports one synchronous block.
@@ -40,10 +40,11 @@ The count and preview update between yields. Cancel keeps committed batches and 
 ## Structure
 
 ```
-src/App.vue            both demos and the heartbeat
-src/demo/catalog.ts    deterministic nested dataset + fuzzy scoring
-src/demo/rows.ts       generated ingestion rows
-src/demo/measure.ts    Long Tasks API comparison harness
+src/App.vue                          both demos and mode control
+src/components/FrameTimeChart.vue    canvas frame-time chart
+src/demo/catalog.ts                   deterministic nested dataset + scoring
+src/demo/rows.ts                      generated ingestion rows
+src/demo/measure.ts                   Long Tasks API comparison harness
 ```
 
 The dataset is generated in the browser so the repository stays small. The generator is seeded and

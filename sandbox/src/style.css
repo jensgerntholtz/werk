@@ -262,43 +262,6 @@ input[type="search"]:focus {
   opacity: 0.45;
 }
 
-.heartbeat {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: #7e8ca3;
-  font-size: 0.74rem;
-  margin: 0.8rem 0;
-}
-
-.heartbeat strong {
-  color: #dfe7f7;
-  font-variant-numeric: tabular-nums;
-}
-
-.pulse {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: #61d99c;
-  box-shadow: 0 0 0 0 rgba(97, 217, 156, 0.5);
-  animation: pulse 1.4s infinite;
-}
-
-.heartbeat.paused .pulse {
-  background: #f4b45e;
-  animation: none;
-}
-
-@keyframes pulse {
-  70% {
-    box-shadow: 0 0 0 7px rgba(97, 217, 156, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(97, 217, 156, 0);
-  }
-}
-
 .muted {
   color: #5f6d83;
 }
