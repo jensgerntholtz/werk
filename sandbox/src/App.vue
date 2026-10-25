@@ -103,7 +103,7 @@ const runNote = computed(() => {
   if (mode.value === 'only') {
     return 'Cooperative path only. Werk yields every 5 ms; the browser keeps painting.'
   }
-  return 'Both paths use the same scorer and 100-hit limit. Werk on yields every 5 ms; werk off does the same work in one block.'
+  return 'Long tasks count individual >50 ms tasks. Worst frame is the longest paint gap, so many smaller tasks still show up. Both paths use the same scorer and 100-hit limit.'
 })
 
 const searchProgress = computed(() => searchTask.progress.value)
@@ -127,12 +127,12 @@ const searchTotal = computed(() => {
 })
 const hits = computed(() => result.value?.hits ?? [])
 const totalMatches = computed(() => result.value?.totalMatches ?? 0)
-const maxLongTask = computed(() =>
-  Math.max(...(runState.value?.cards.map((card) => card.metrics.longestLongTaskMs) ?? [0]), 1),
+const maxWorstFrame = computed(() =>
+  Math.max(...(runState.value?.cards.map((card) => card.metrics.worstFrameMs) ?? [0]), 1),
 )
 
-function taskWidth(milliseconds: number): string {
-  return `${Math.max(4, Math.round((milliseconds / maxLongTask.value) * 100))}%`
+function frameWidth(milliseconds: number): string {
+  return `${Math.max(4, Math.round((milliseconds / maxWorstFrame.value) * 100))}%`
 }
 
 function nextFrame(): Promise<void> {
@@ -443,8 +443,8 @@ onBeforeUnmount(() => {
                   <dd>{{ card.metrics.longTasks }}</dd>
                 </div>
                 <div>
-                  <dt>longest task</dt>
-                  <dd>{{ formatMs(card.metrics.longestLongTaskMs) }}</dd>
+                  <dt>worst frame</dt>
+                  <dd>{{ formatMs(card.metrics.worstFrameMs) }}</dd>
                 </div>
                 <div>
                   <dt>yields</dt>
@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
                 </div>
               </dl>
               <div class="meter">
-                <span :style="{ width: taskWidth(card.metrics.longestLongTaskMs) }"></span>
+                <span :style="{ width: frameWidth(card.metrics.worstFrameMs) }"></span>
               </div>
             </article>
           </div>

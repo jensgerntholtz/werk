@@ -27,7 +27,9 @@ bounded top-100 heap, so the cooperative path never sorts the full 590k-match se
   - **Werk Only** runs the cooperative path only.
   - **Werk Off** runs the same search synchronously.
   - **Werk Compare** runs both back to back and shows an A/B panel.
-- Each run reports total time, long tasks over 50 ms, longest task, and cooperative yields.
+- Each run reports total time, long tasks over 50 ms, worst frame gap, and cooperative yields.
+  Worst frame is the important one: many sub-50 ms tasks can still blow the frame budget without
+  producing a Long Task.
 - The query stays editable while a run is in flight. If it changes, the next run is queued.
 - The frame-time chart tracks recent `requestAnimationFrame` gaps on a fixed 0–50 ms scale. During
   werk-off the chart stalls and then shows the long frame; werk-on keeps drawing.
