@@ -46,6 +46,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["sandbox/src/style.css"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDescendingSpecificity": "off"
+          }
+        }
+      }
     }
   ]
 }

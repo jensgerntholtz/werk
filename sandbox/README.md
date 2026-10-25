@@ -17,15 +17,18 @@ hot-reload without rebuilding the package.
 
 ## What to look at
 
-**Fuzzy search.** Searches 30,000 deterministically generated nested catalogue records. The query
+**Fuzzy search.** Searches 60,000 deterministically generated nested catalogue records. The query
 is scored as a subsequence across title, author, tags, and summary. The work runs through
 `werk.task` with a 5 ms budget, progress refs, and latest-run-wins cancellation.
 
 - Type a query and watch the progress bar.
-- Press **Blocking baseline** to run the same search synchronously. The UI heartbeat counter
-  freezes while the main thread is blocked.
-- The elapsed numbers are not the point. Wall-clock time may be similar; the difference is whether
-  the browser can paint and handle input between slices.
+- Press **Compare werk on vs off** to run the same query twice, back to back. The comparison reports
+  total time, long tasks over 50 ms, and the number of cooperative yields.
+- The UI heartbeat freezes during the werk-off run. Total time is not the point; the difference is
+  whether the browser gets the main thread back between slices.
+
+The comparison uses the browser's `PerformanceObserver` Long Tasks API (Chromium-based browsers).
+Werk-on should report zero long tasks while yielding; werk-off reports one synchronous block.
 
 **Budgeted ingestion.** Applies 15,000 generated rows through `werk.ingest` in bounded batches.
 The count and preview update between yields. Cancel keeps committed batches and drops the tail.
@@ -36,7 +39,7 @@ The count and preview update between yields. Cancel keeps committed batches and 
 src/App.vue            both demos and the heartbeat
 src/demo/catalog.ts    deterministic nested dataset + fuzzy scoring
 src/demo/rows.ts       generated ingestion rows
-src/demo/...           no committed large JSON fixture
+src/demo/measure.ts    Long Tasks API comparison harness
 ```
 
 The dataset is generated in the browser so the repository stays small. The generator is seeded and

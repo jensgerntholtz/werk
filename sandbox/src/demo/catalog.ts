@@ -4,6 +4,8 @@ export interface CatalogEntry {
   author: { name: string; country: string }
   tags: string[]
   summary: string
+  titleLower: string
+  summaryLower: string
   metadata: {
     year: number
     rating: number
@@ -205,6 +207,8 @@ function buildCatalog(count: number): CatalogEntry[] {
       author,
       tags,
       summary,
+      titleLower: title.toLowerCase(),
+      summaryLower: summary.toLowerCase(),
       metadata,
       searchText: '',
     }
@@ -226,7 +230,7 @@ function buildCatalog(count: number): CatalogEntry[] {
   })
 }
 
-export const CATALOG: readonly CatalogEntry[] = buildCatalog(30_000)
+export const CATALOG: readonly CatalogEntry[] = buildCatalog(60_000)
 export const CATALOG_SIZE = CATALOG.length
 
 export function fuzzyScore(text: string, query: string): number {
@@ -252,9 +256,13 @@ export function fuzzyScore(text: string, query: string): number {
 }
 
 export function scoreEntry(entry: CatalogEntry, normalizedQuery: string): number {
-  const score = fuzzyScore(entry.searchText, normalizedQuery)
-  if (score === 0) return 0
-  return score + (entry.title.toLowerCase().includes(normalizedQuery) ? 24 : 0)
+  const base = fuzzyScore(entry.searchText, normalizedQuery)
+  if (base === 0) return 0
+
+  const title = fuzzyScore(entry.titleLower, normalizedQuery)
+  const summary = fuzzyScore(entry.summaryLower, normalizedQuery)
+  const titleBoost = entry.titleLower.includes(normalizedQuery) ? 24 : 0
+  return base + title * 3 + summary + titleBoost
 }
 
 export function searchCatalog(query: string, limit = 100): SearchResult {

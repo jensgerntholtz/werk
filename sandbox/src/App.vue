@@ -9,6 +9,7 @@ import {
   scoreEntry,
   searchCatalog,
 } from './demo/catalog'
+import { measureMainThread, type RunMetrics } from './demo/measure'
 import { type DemoRow, makeRows } from './demo/rows'
 
 const SEARCH_LIMIT = 100
@@ -22,6 +23,14 @@ const baselineElapsedMs = ref<number | null>(null)
 const lastMode = ref<'werk' | 'baseline' | null>(null)
 const heartbeat = ref(0)
 const blocking = ref(false)
+const compareRunning = ref(false)
+const werkYields = ref(0)
+const comparison = shallowRef<{
+  query: string
+  werk: RunMetrics
+  off: RunMetrics
+  werkYields: number
+} | null>(null)
 
 const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, reportProgress }) => {
   const normalized = query.value.trim().toLowerCase()
@@ -32,6 +41,7 @@ const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, re
 
   const found: SearchHit[] = []
   let processed = 0
+  let yields = 0
 
   for (const entry of CATALOG) {
     if (signal.aborted) break
@@ -43,11 +53,13 @@ const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, re
     processed += 1
 
     if (budget.exceeded()) {
+      yields += 1
       reportProgress(processed, CATALOG_SIZE)
       await yieldNow()
     }
   }
 
+  werkYields.value = yields
   reportProgress(CATALOG_SIZE, CATALOG_SIZE)
   found.sort((left, right) => right.score - left.score)
   return { hits: found.slice(0, SEARCH_LIMIT), totalMatches: found.length }
@@ -75,11 +87,23 @@ const searchTotal = computed(() => {
 })
 const hits = computed(() => result.value?.hits ?? [])
 const totalMatches = computed(() => result.value?.totalMatches ?? 0)
+const comparisonMaxTask = computed(() =>
+  Math.max(
+    comparison.value?.werk.longestLongTaskMs ?? 0,
+    comparison.value?.off.longestLongTaskMs ?? 0,
+    1,
+  ),
+)
+
+function blockWidth(milliseconds: number): string {
+  return `${Math.max(4, Math.round((milliseconds / comparisonMaxTask.value) * 100))}%`
+}
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 
 async function runWerk(): Promise<void> {
+  comparison.value = null
   const started = performance.now()
   try {
     const next = await searchTask.run()
@@ -92,19 +116,49 @@ async function runWerk(): Promise<void> {
   }
 }
 
-async function runBaseline(): Promise<void> {
-  searchTask.cancel()
-  blocking.value = true
-  await new Promise<void>((resolve) => {
-    window.setTimeout(resolve, 25)
-  })
+async function runComparison(): Promise<void> {
+  if (compareRunning.value) return
 
-  const started = performance.now()
-  const next = searchCatalog(query.value)
-  baselineElapsedMs.value = performance.now() - started
-  result.value = next
-  lastMode.value = 'baseline'
-  blocking.value = false
+  compareRunning.value = true
+  comparison.value = null
+  searchTask.cancel()
+  const queryAtStart = query.value
+
+  try {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+
+    blocking.value = true
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+    const off = await measureMainThread(() => {
+      result.value = searchCatalog(queryAtStart)
+    })
+    baselineElapsedMs.value = off.elapsedMs
+    lastMode.value = 'baseline'
+    blocking.value = false
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+
+    const werk = await measureMainThread(async () => {
+      const next = await searchTask.run()
+      if (next !== undefined) {
+        result.value = next
+      }
+    })
+    werkElapsedMs.value = werk.elapsedMs
+    lastMode.value = 'werk'
+    comparison.value = { query: queryAtStart, werk, off, werkYields: werkYields.value }
+  } catch (cause) {
+    console.error('comparison failed', cause)
+  } finally {
+    blocking.value = false
+    compareRunning.value = false
+  }
 }
 
 const ingestCount = ref(0)
@@ -181,6 +235,8 @@ function formatMs(value: number | null): string {
 }
 
 watch(query, () => {
+  if (compareRunning.value) return
+  comparison.value = null
   window.clearTimeout(debounceTimer)
   debounceTimer = window.setTimeout(() => {
     void runWerk()
@@ -210,8 +266,8 @@ onBeforeUnmount(() => {
       <p class="lede">
         Two compute-heavy examples running on the main thread. The left panel searches
         {{ CATALOG_SIZE.toLocaleString() }} nested records with a 5 ms cooperative budget. The right
-        panel applies {{ ROW_COUNT.toLocaleString() }} rows in bounded slices. Press the baseline
-        button to feel the difference.
+        panel applies {{ ROW_COUNT.toLocaleString() }} rows in bounded slices. Run the A/B
+        comparison to see the main-thread difference.
       </p>
       <div class="stats">
         <div class="stat">
@@ -247,17 +303,29 @@ onBeforeUnmount(() => {
             placeholder="Try “sil”, “atlas”, or “glass”"
             autocomplete="off"
             spellcheck="false"
+            :disabled="compareRunning"
           />
         </label>
 
         <div class="actions">
-          <button class="button primary" :disabled="searchPending" @click="runWerk">
-            {{ searchPending ? 'Searching…' : 'Search with werk' }}
+          <button
+            class="button primary"
+            :disabled="compareRunning || searchPending"
+            @click="runComparison"
+          >
+            {{ compareRunning ? 'Comparing…' : 'Compare werk on vs off' }}
           </button>
-          <button class="button ghost" :disabled="blocking" @click="runBaseline">
-            {{ blocking ? 'Blocking…' : 'Blocking baseline' }}
+          <button
+            class="button ghost"
+            :disabled="compareRunning || searchPending"
+            @click="runWerk"
+          >
+            Werk only
           </button>
         </div>
+        <p class="action-note">
+          Runs the same query twice, back to back: first blocking, then yielding.
+        </p>
 
         <div class="heartbeat" :class="{ paused: blocking }">
           <span class="pulse"></span>
@@ -287,6 +355,79 @@ onBeforeUnmount(() => {
           <span v-if="werkElapsedMs !== null">werk {{ werkElapsedLabel }}</span>
           <span v-if="baselineElapsedMs !== null">baseline {{ baselineElapsedLabel }}</span>
           <span v-if="lastMode !== null" class="muted">last: {{ lastMode }}</span>
+        </div>
+
+        <div v-if="comparison" class="comparison">
+          <div class="comparison-head">
+            <div>
+              <span class="eyebrow">A/B comparison</span>
+              <span class="muted">query “{{ comparison.query }}” · same dataset</span>
+            </div>
+            <span class="badge">{{ CATALOG_SIZE.toLocaleString() }} records</span>
+          </div>
+
+          <div class="comparison-grid">
+            <article class="compare-card on">
+              <header>
+                <strong>werk on</strong>
+                <span class="compare-tag">cooperative</span>
+              </header>
+              <dl>
+                <div>
+                  <dt>total</dt>
+                  <dd>{{ formatMs(comparison.werk.elapsedMs) }}</dd>
+                </div>
+                <div>
+                  <dt>long tasks</dt>
+                  <dd>{{ comparison.werk.longTasks }}</dd>
+                </div>
+                <div>
+                  <dt>longest task</dt>
+                  <dd>{{ formatMs(comparison.werk.longestLongTaskMs) }}</dd>
+                </div>
+                <div>
+                  <dt>yields</dt>
+                  <dd>{{ comparison.werkYields }}</dd>
+                </div>
+              </dl>
+              <div class="meter">
+                <span :style="{ width: blockWidth(comparison.werk.longestLongTaskMs) }"></span>
+              </div>
+            </article>
+
+            <article class="compare-card off">
+              <header>
+                <strong>werk off</strong>
+                <span class="compare-tag">blocking</span>
+              </header>
+              <dl>
+                <div>
+                  <dt>total</dt>
+                  <dd>{{ formatMs(comparison.off.elapsedMs) }}</dd>
+                </div>
+                <div>
+                  <dt>long tasks</dt>
+                  <dd>{{ comparison.off.longTasks }}</dd>
+                </div>
+                <div>
+                  <dt>longest task</dt>
+                  <dd>{{ formatMs(comparison.off.longestLongTaskMs) }}</dd>
+                </div>
+                <div>
+                  <dt>yields</dt>
+                  <dd>0</dd>
+                </div>
+              </dl>
+              <div class="meter">
+                <span :style="{ width: blockWidth(comparison.off.longestLongTaskMs) }"></span>
+              </div>
+            </article>
+          </div>
+
+          <p class="comparison-note">
+            Long tasks are main-thread blocks over 50 ms. Both runs return the same 100 hits.
+            Werk on yields every 5 ms; werk off does the same work in one block.
+          </p>
         </div>
 
         <ul class="results">

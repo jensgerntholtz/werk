@@ -326,6 +326,136 @@ input[type="search"]:focus {
   color: #dfe7f7;
 }
 
+.action-note {
+  color: #5f6d83;
+  font-size: 0.7rem;
+  margin: -0.2rem 0 0.8rem;
+}
+
+.comparison {
+  border-top: 1px solid rgba(148, 166, 199, 0.12);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.comparison-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.comparison-head > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.comparison-head .eyebrow {
+  font-size: 0.64rem;
+}
+
+.comparison-head .muted {
+  font-size: 0.7rem;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.compare-card {
+  border: 1px solid rgba(148, 166, 199, 0.12);
+  border-radius: 0.75rem;
+  background: rgba(148, 166, 199, 0.025);
+  padding: 0.65rem;
+}
+
+.compare-card.on {
+  border-color: rgba(97, 217, 156, 0.24);
+}
+
+.compare-card.off {
+  border-color: rgba(255, 115, 115, 0.22);
+}
+
+.compare-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.compare-card header strong {
+  font-size: 0.78rem;
+}
+
+.compare-tag {
+  color: #6f7d94;
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compare-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+  margin: 0.65rem 0;
+}
+
+.compare-card dl > div {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.compare-card dt {
+  color: #5f6d83;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.compare-card dd {
+  margin: 0;
+  color: #dce5f5;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  height: 0.3rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 166, 199, 0.14);
+}
+
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.compare-card.on .meter > span {
+  background: linear-gradient(90deg, #47c98a, #61d99c);
+}
+
+.compare-card.off .meter > span {
+  background: linear-gradient(90deg, #d96363, #ff8a8a);
+}
+
+.comparison-note {
+  color: #5f6d83;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  margin: 0.7rem 0 0;
+}
+
 .results {
   display: grid;
   gap: 0.45rem;
