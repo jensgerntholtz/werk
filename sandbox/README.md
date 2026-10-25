@@ -21,11 +21,14 @@ hot-reload without rebuilding the package.
 is scored as a subsequence across title, author, tags, and summary. The work runs through
 `werk.task` with a 5 ms budget, progress refs, and latest-run-wins cancellation.
 
-- Type a query and watch the progress bar.
-- Press **Compare werk on vs off** to run the same query twice, back to back. The comparison reports
-  total time, long tasks over 50 ms, and the number of cooperative yields.
-- The UI heartbeat freezes during the werk-off run. Total time is not the point; the difference is
-  whether the browser gets the main thread back between slices.
+- Switch between **Werk Only**, **Werk Off**, and **Werk Compare**. The switch controls both the run
+  button and the automatic rerun when the query changes.
+  - **Werk Only** runs the cooperative path only.
+  - **Werk Off** runs the same search synchronously.
+  - **Werk Compare** runs both back to back and shows an A/B panel.
+- Each run reports total time, long tasks over 50 ms, longest task, and cooperative yields.
+- The UI heartbeat freezes during werk-off. Total time is not the point; the difference is whether
+  the browser gets the main thread back between slices.
 
 The comparison uses the browser's `PerformanceObserver` Long Tasks API (Chromium-based browsers).
 Werk-on should report zero long tasks while yielding; werk-off reports one synchronous block.

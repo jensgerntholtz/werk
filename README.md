@@ -21,8 +21,8 @@ free. It owns the work that crosses its boundary and shows everything else in th
 - `werk.ingest` — applies iterables to Vue state in bounded batches with cooperative yields.
 - 5 ms default budget with `scheduler.yield()` → `scheduler.postTask()` → `MessageChannel`
   fallbacks; `yieldNow()` resets the budget on resume.
-- A Vue sandbox that demonstrates cooperative fuzzy search and budgeted ingestion, with an A/B
-  comparison against the same work on the main thread (Long Tasks API).
+- A Vue sandbox that demonstrates cooperative fuzzy search and budgeted ingestion, with a
+  Werk Only / Werk Off / Werk Compare switch and a Long Tasks A/B panel.
 
 Not implemented yet: worker backend, progress transports, backpressure, route/session scopes,
 visibility throttling, adaptive chunk sizing, and the entire build layer.

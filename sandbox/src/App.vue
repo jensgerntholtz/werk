@@ -12,25 +12,39 @@ import {
 import { measureMainThread, type RunMetrics } from './demo/measure'
 import { type DemoRow, makeRows } from './demo/rows'
 
+type Mode = 'only' | 'off' | 'compare'
+
+interface RunCard {
+  id: 'on' | 'off'
+  title: string
+  tag: string
+  metrics: RunMetrics
+  yields: number
+}
+
+interface RunState {
+  query: string
+  cards: RunCard[]
+}
+
+const MODE_OPTIONS: readonly { value: Mode; label: string }[] = [
+  { value: 'only', label: 'Werk Only' },
+  { value: 'off', label: 'Werk Off' },
+  { value: 'compare', label: 'Werk Compare' },
+]
+
 const SEARCH_LIMIT = 100
 const rowsSource = makeRows(15_000)
 const ROW_COUNT = rowsSource.length
 
+const mode = ref<Mode>('compare')
+const modeRunning = ref(false)
+const runState = shallowRef<RunState | null>(null)
 const query = ref('sil')
 const result = shallowRef<SearchResult | null>(null)
-const werkElapsedMs = ref<number | null>(null)
-const baselineElapsedMs = ref<number | null>(null)
-const lastMode = ref<'werk' | 'baseline' | null>(null)
 const heartbeat = ref(0)
 const blocking = ref(false)
-const compareRunning = ref(false)
 const werkYields = ref(0)
-const comparison = shallowRef<{
-  query: string
-  werk: RunMetrics
-  off: RunMetrics
-  werkYields: number
-} | null>(null)
 
 const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, reportProgress }) => {
   const normalized = query.value.trim().toLowerCase()
@@ -65,7 +79,30 @@ const searchTask = werk.task<SearchResult>(async ({ budget, signal, yieldNow, re
   return { hits: found.slice(0, SEARCH_LIMIT), totalMatches: found.length }
 })
 
-const searchPending = computed(() => searchTask.pending.value)
+const currentModeLabel = computed(
+  () => MODE_OPTIONS.find((option) => option.value === mode.value)?.label ?? '',
+)
+const modeNote = computed(() => {
+  if (mode.value === 'off') return 'Same work, no cooperative yields.'
+  if (mode.value === 'only') return 'Cooperative path only, no baseline.'
+  return 'Runs both paths back to back and compares them.'
+})
+const runLabel = computed(() => {
+  if (mode.value === 'off') return 'Run werk off'
+  if (mode.value === 'only') return 'Run werk only'
+  return 'Compare werk on vs off'
+})
+const runTitle = computed(() => (mode.value === 'compare' ? 'A/B comparison' : 'Run metrics'))
+const runNote = computed(() => {
+  if (mode.value === 'off') {
+    return 'Synchronous path only. The main thread is held for the whole search.'
+  }
+  if (mode.value === 'only') {
+    return 'Cooperative path only. Werk yields every 5 ms; the browser keeps painting.'
+  }
+  return 'Both paths use the same scorer and 100-hit limit. Werk on yields every 5 ms; werk off does the same work in one block.'
+})
+
 const searchProgress = computed(() => searchTask.progress.value)
 const searchError = computed(() => {
   const error = searchTask.error.value
@@ -87,78 +124,87 @@ const searchTotal = computed(() => {
 })
 const hits = computed(() => result.value?.hits ?? [])
 const totalMatches = computed(() => result.value?.totalMatches ?? 0)
-const comparisonMaxTask = computed(() =>
-  Math.max(
-    comparison.value?.werk.longestLongTaskMs ?? 0,
-    comparison.value?.off.longestLongTaskMs ?? 0,
-    1,
-  ),
+const maxLongTask = computed(() =>
+  Math.max(...(runState.value?.cards.map((card) => card.metrics.longestLongTaskMs) ?? [0]), 1),
 )
 
-function blockWidth(milliseconds: number): string {
-  return `${Math.max(4, Math.round((milliseconds / comparisonMaxTask.value) * 100))}%`
+function taskWidth(milliseconds: number): string {
+  return `${Math.max(4, Math.round((milliseconds / maxLongTask.value) * 100))}%`
 }
 
-let debounceTimer: ReturnType<typeof setTimeout> | undefined
-let heartbeatTimer: ReturnType<typeof setInterval> | undefined
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve())
+  })
+}
 
-async function runWerk(): Promise<void> {
-  comparison.value = null
-  const started = performance.now()
-  try {
+function onCard(metrics: RunMetrics): RunCard {
+  return { id: 'on', title: 'werk on', tag: 'cooperative', metrics, yields: werkYields.value }
+}
+
+function offCard(metrics: RunMetrics): RunCard {
+  return { id: 'off', title: 'werk off', tag: 'blocking', metrics, yields: 0 }
+}
+
+async function measureOn(): Promise<RunMetrics> {
+  return measureMainThread(async () => {
     const next = await searchTask.run()
-    if (next === undefined) return
-    result.value = next
-    werkElapsedMs.value = performance.now() - started
-    lastMode.value = 'werk'
-  } catch (cause) {
-    console.error('werk search failed', cause)
-  }
+    if (next !== undefined) {
+      result.value = next
+    }
+  })
 }
 
-async function runComparison(): Promise<void> {
-  if (compareRunning.value) return
+async function runMode(): Promise<void> {
+  if (modeRunning.value) return
 
-  compareRunning.value = true
-  comparison.value = null
-  searchTask.cancel()
+  modeRunning.value = true
+  const activeMode = mode.value
   const queryAtStart = query.value
+  runState.value = null
+  werkYields.value = 0
+  searchTask.cancel()
 
   try {
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve())
-    })
+    await nextFrame()
+
+    if (activeMode === 'only') {
+      const onMetrics = await measureOn()
+      runState.value = { query: queryAtStart, cards: [onCard(onMetrics)] }
+      return
+    }
 
     blocking.value = true
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve())
-    })
-    const off = await measureMainThread(() => {
+    await nextFrame()
+    const offMetrics = await measureMainThread(() => {
       result.value = searchCatalog(queryAtStart)
     })
-    baselineElapsedMs.value = off.elapsedMs
-    lastMode.value = 'baseline'
     blocking.value = false
 
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve())
-    })
+    if (activeMode === 'off') {
+      runState.value = { query: queryAtStart, cards: [offCard(offMetrics)] }
+      return
+    }
 
-    const werk = await measureMainThread(async () => {
-      const next = await searchTask.run()
-      if (next !== undefined) {
-        result.value = next
-      }
-    })
-    werkElapsedMs.value = werk.elapsedMs
-    lastMode.value = 'werk'
-    comparison.value = { query: queryAtStart, werk, off, werkYields: werkYields.value }
+    await nextFrame()
+    const onMetrics = await measureOn()
+    runState.value = {
+      query: queryAtStart,
+      cards: [onCard(onMetrics), offCard(offMetrics)],
+    }
   } catch (cause) {
-    console.error('comparison failed', cause)
+    console.error('search run failed', cause)
   } finally {
     blocking.value = false
-    compareRunning.value = false
+    modeRunning.value = false
   }
+}
+
+function setMode(next: Mode): void {
+  if (modeRunning.value || mode.value === next) return
+  window.clearTimeout(debounceTimer)
+  mode.value = next
+  void runMode()
 }
 
 const ingestCount = ref(0)
@@ -177,8 +223,6 @@ const ingestPercent = computed(() => {
 const ingestPercentLabel = computed(() =>
   ingestPercent.value === null ? '—' : `${ingestPercent.value}%`,
 )
-const werkElapsedLabel = computed(() => formatMs(werkElapsedMs.value))
-const baselineElapsedLabel = computed(() => formatMs(baselineElapsedMs.value))
 const ingestElapsedLabel = computed(() => formatMs(ingestElapsedMs.value))
 
 async function runIngest(): Promise<void> {
@@ -234,20 +278,22 @@ function formatMs(value: number | null): string {
   return value < 10 ? `${value.toFixed(1)} ms` : `${value.toFixed(0)} ms`
 }
 
+let debounceTimer: ReturnType<typeof setTimeout> | undefined
+let heartbeatTimer: ReturnType<typeof setInterval> | undefined
+
 watch(query, () => {
-  if (compareRunning.value) return
-  comparison.value = null
+  if (modeRunning.value) return
   window.clearTimeout(debounceTimer)
   debounceTimer = window.setTimeout(() => {
-    void runWerk()
-  }, 120)
+    void runMode()
+  }, 150)
 })
 
 onMounted(() => {
   heartbeatTimer = window.setInterval(() => {
     heartbeat.value += 1
   }, 50)
-  void runWerk()
+  void runMode()
 })
 
 onBeforeUnmount(() => {
@@ -266,8 +312,8 @@ onBeforeUnmount(() => {
       <p class="lede">
         Two compute-heavy examples running on the main thread. The left panel searches
         {{ CATALOG_SIZE.toLocaleString() }} nested records with a 5 ms cooperative budget. The right
-        panel applies {{ ROW_COUNT.toLocaleString() }} rows in bounded slices. Run the A/B
-        comparison to see the main-thread difference.
+        panel applies {{ ROW_COUNT.toLocaleString() }} rows in bounded slices. Switch between modes
+        to compare the same work with and without werk.
       </p>
       <div class="stats">
         <div class="stat">
@@ -295,6 +341,22 @@ onBeforeUnmount(() => {
           <span class="badge">werk.task</span>
         </div>
 
+        <div class="mode-switch" role="group" aria-label="Execution mode">
+          <button
+            v-for="option in MODE_OPTIONS"
+            :key="option.value"
+            type="button"
+            class="mode-option"
+            :class="{ active: mode === option.value }"
+            :aria-pressed="mode === option.value"
+            :disabled="modeRunning"
+            @click="setMode(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <p class="mode-note">{{ modeNote }}</p>
+
         <label class="field">
           <span>Query</span>
           <input
@@ -303,29 +365,15 @@ onBeforeUnmount(() => {
             placeholder="Try “sil”, “atlas”, or “glass”"
             autocomplete="off"
             spellcheck="false"
-            :disabled="compareRunning"
+            :disabled="modeRunning"
           />
         </label>
 
         <div class="actions">
-          <button
-            class="button primary"
-            :disabled="compareRunning || searchPending"
-            @click="runComparison"
-          >
-            {{ compareRunning ? 'Comparing…' : 'Compare werk on vs off' }}
-          </button>
-          <button
-            class="button ghost"
-            :disabled="compareRunning || searchPending"
-            @click="runWerk"
-          >
-            Werk only
+          <button class="button primary" :disabled="modeRunning" @click="runMode">
+            {{ modeRunning ? 'Running…' : runLabel }}
           </button>
         </div>
-        <p class="action-note">
-          Runs the same query twice, back to back: first blocking, then yielding.
-        </p>
 
         <div class="heartbeat" :class="{ paused: blocking }">
           <span class="pulse"></span>
@@ -334,15 +382,22 @@ onBeforeUnmount(() => {
           <span class="muted">50 ms interval</span>
         </div>
 
-        <div v-if="searchPending || searchPercent !== null" class="progress">
-          <div class="bar" :class="{ indeterminate: searchPercent === null }">
+        <div
+          v-if="modeRunning || (searchPercent !== null && mode !== 'off')"
+          class="progress"
+        >
+          <div class="bar" :class="{ indeterminate: searchPercent === null || blocking }">
             <span
-              :style="searchPercent === null ? undefined : { width: `${searchPercent}%` }"
+              :style="
+                searchPercent === null || blocking ? undefined : { width: `${searchPercent}%` }
+              "
             ></span>
           </div>
           <div class="progress-meta">
-            <span>{{ searchPercent === null ? 'yielding' : `${searchPercent}%` }}</span>
-            <span v-if="searchCompleted !== null && searchTotal !== null">
+            <span>{{
+              blocking ? 'blocking' : searchPercent === null ? 'yielding' : `${searchPercent}%`
+            }}</span>
+            <span v-if="!blocking && searchCompleted !== null && searchTotal !== null">
               {{ searchCompleted.toLocaleString() }} / {{ searchTotal.toLocaleString() }}
             </span>
           </div>
@@ -352,82 +407,55 @@ onBeforeUnmount(() => {
 
         <div class="meta">
           <span><strong>{{ totalMatches.toLocaleString() }}</strong> matches</span>
-          <span v-if="werkElapsedMs !== null">werk {{ werkElapsedLabel }}</span>
-          <span v-if="baselineElapsedMs !== null">baseline {{ baselineElapsedLabel }}</span>
-          <span v-if="lastMode !== null" class="muted">last: {{ lastMode }}</span>
+          <span class="muted">mode: {{ currentModeLabel }}</span>
+          <span v-if="werkYields > 0">{{ werkYields }} yields</span>
         </div>
 
-        <div v-if="comparison" class="comparison">
+        <div v-if="runState" class="comparison">
           <div class="comparison-head">
             <div>
-              <span class="eyebrow">A/B comparison</span>
-              <span class="muted">query “{{ comparison.query }}” · same dataset</span>
+              <span class="eyebrow">{{ runTitle }}</span>
+              <span class="muted">query “{{ runState.query }}” · same dataset</span>
             </div>
             <span class="badge">{{ CATALOG_SIZE.toLocaleString() }} records</span>
           </div>
 
-          <div class="comparison-grid">
-            <article class="compare-card on">
+          <div class="comparison-grid" :class="{ single: runState.cards.length === 1 }">
+            <article
+              v-for="card in runState.cards"
+              :key="card.id"
+              class="compare-card"
+              :class="card.id"
+            >
               <header>
-                <strong>werk on</strong>
-                <span class="compare-tag">cooperative</span>
+                <strong>{{ card.title }}</strong>
+                <span class="compare-tag">{{ card.tag }}</span>
               </header>
               <dl>
                 <div>
                   <dt>total</dt>
-                  <dd>{{ formatMs(comparison.werk.elapsedMs) }}</dd>
+                  <dd>{{ formatMs(card.metrics.elapsedMs) }}</dd>
                 </div>
                 <div>
                   <dt>long tasks</dt>
-                  <dd>{{ comparison.werk.longTasks }}</dd>
+                  <dd>{{ card.metrics.longTasks }}</dd>
                 </div>
                 <div>
                   <dt>longest task</dt>
-                  <dd>{{ formatMs(comparison.werk.longestLongTaskMs) }}</dd>
+                  <dd>{{ formatMs(card.metrics.longestLongTaskMs) }}</dd>
                 </div>
                 <div>
                   <dt>yields</dt>
-                  <dd>{{ comparison.werkYields }}</dd>
+                  <dd>{{ card.yields }}</dd>
                 </div>
               </dl>
               <div class="meter">
-                <span :style="{ width: blockWidth(comparison.werk.longestLongTaskMs) }"></span>
-              </div>
-            </article>
-
-            <article class="compare-card off">
-              <header>
-                <strong>werk off</strong>
-                <span class="compare-tag">blocking</span>
-              </header>
-              <dl>
-                <div>
-                  <dt>total</dt>
-                  <dd>{{ formatMs(comparison.off.elapsedMs) }}</dd>
-                </div>
-                <div>
-                  <dt>long tasks</dt>
-                  <dd>{{ comparison.off.longTasks }}</dd>
-                </div>
-                <div>
-                  <dt>longest task</dt>
-                  <dd>{{ formatMs(comparison.off.longestLongTaskMs) }}</dd>
-                </div>
-                <div>
-                  <dt>yields</dt>
-                  <dd>0</dd>
-                </div>
-              </dl>
-              <div class="meter">
-                <span :style="{ width: blockWidth(comparison.off.longestLongTaskMs) }"></span>
+                <span :style="{ width: taskWidth(card.metrics.longestLongTaskMs) }"></span>
               </div>
             </article>
           </div>
 
-          <p class="comparison-note">
-            Long tasks are main-thread blocks over 50 ms. Both runs return the same 100 hits.
-            Werk on yields every 5 ms; werk off does the same work in one block.
-          </p>
+          <p class="comparison-note">{{ runNote }}</p>
         </div>
 
         <ul class="results">
