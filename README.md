@@ -4,13 +4,28 @@
 
 **Werk is a frame budgeter for large client-rendered Vue applications.**
 
-> Status: **foundation**. This repository currently contains workspace tooling and design
-> contracts only. The runtime API lands in the next commit and nothing is published.
+> Status: **early preview**. The cooperative runtime is implemented and exercised by the
+> sandbox. Nothing is published. Workers, progress transports, route scopes, and the build layer
+> are still design-only.
 
 Werk is built around one invariant: no werk-managed task runs longer than a small JavaScript
 budget (roughly 5–8 ms) before yielding, leaving headroom for style, layout, paint, and the
 browser's own work. It does not make Vue's rendering, third-party scripts, or garbage collection
 free. It owns the work that crosses its boundary and shows everything else in the inspector.
+
+## Implemented today
+
+- `werk.task` — `shallowRef` data plus pending/error/status/progress refs, latest-run-wins
+  cancellation, and an explicit async boundary.
+- `werk.effect` — the async watch-callback pattern with budget helpers.
+- `werk.ingest` — applies iterables to Vue state in bounded batches with cooperative yields.
+- 5 ms default budget with `scheduler.yield()` → `scheduler.postTask()` → `MessageChannel`
+  fallbacks; `yieldNow()` resets the budget on resume.
+- A Vue sandbox that demonstrates cooperative fuzzy search and budgeted ingestion side by side
+  with a blocking baseline.
+
+Not implemented yet: worker backend, progress transports, backpressure, route/session scopes,
+visibility throttling, adaptive chunk sizing, and the entire build layer.
 
 ## Two independent products
 
@@ -61,7 +76,8 @@ the honest claim is **“werk owns the frame budget for all work crossing its bo
 
 ```
 docs/                 architecture, contracts, build-layer design, roadmap
-packages/core/        @werk/core — runtime scheduler (stub until commit 2)
+packages/core/        @werk/core — cooperative budget runtime + Vue refs
+sandbox/              Vue 3 + Vite demo consuming @werk/core from source
 ```
 
 Future packages (`@werk/app`, `create-werk`, build layer) are intentionally not scaffolded yet.
@@ -73,14 +89,15 @@ Requires Node `>=22.12.0` and pnpm `12.14.0`.
 
 ```sh
 pnpm install
+pnpm dev         # sandbox at http://localhost:5180
 pnpm check       # Biome
-pnpm typecheck   # tsc -b (same incremental graph as build)
+pnpm typecheck   # core tsc -b + sandbox vue-tsc
 pnpm test        # Vitest
-pnpm build
+pnpm build       # core + sandbox production builds
 ```
 
-On a clean checkout, `pnpm typecheck` emits into `dist/` as well. Project-reference builds have
-no `--noEmit` mode, and the generated output is ignored by git.
+`pnpm typecheck` runs the core project-reference build, which emits into ignored `dist/`, then
+typechecks the sandbox with `vue-tsc`.
 
 ## Documentation
 
@@ -88,6 +105,7 @@ no `--noEmit` mode, and the generated output is ignored by git.
 - [Runtime contracts](docs/runtime-contracts.md) — normative v1 semantics.
 - [Build layer](docs/build-layer.md) — generated graph, chunks, flags, checker, inspector.
 - [Roadmap](docs/roadmap.md) — phasing, exit criteria, open risks.
+- [Sandbox](sandbox/README.md) — how the demo works and what to look for.
 - [ADR 0001](docs/adr/0001-foundation.md) — foundation decisions.
 
 ## License

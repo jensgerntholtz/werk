@@ -1,6 +1,6 @@
 # Architecture
 
-Status: accepted design. No runtime or build-layer implementation exists yet. The normative
+Status: runtime v0 implemented (cooperative backend); build layer design only. The normative
 behavior lives in [runtime-contracts.md](runtime-contracts.md); this document explains the shape.
 
 ## The invariant
@@ -44,13 +44,13 @@ application code
 
 - **Cooperative (default).** Main-thread work is split into units and yields between them. No
   serialization, no worker cold start. Vue reactivity continues to work between units. This is
-  the correct default for most "heavy" work.
+  the correct default for most "heavy" work. **Implemented in v0.**
 - **Worker (escalation).** Only for one non-decomposable CPU unit that cannot be split: parsing,
   a large sort, tokenization. The developer tags the task. The worker is bundled per task with a
-  typed boundary; a broken task body becomes a compile error at the call site.
+  typed boundary; a broken task body becomes a compile error at the call site. **Design only.**
 - **Ingest.** Results from either backend are applied to reactive state in small batches. This
   keeps the Vue scheduler and downstream render work inside the frame budget even when the
-  computation itself is fast.
+  computation itself is fast. **Implemented in v0.**
 
 ### Frame-budget model
 

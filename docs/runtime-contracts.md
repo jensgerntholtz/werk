@@ -1,8 +1,10 @@
 # Runtime Contracts (v1)
 
-Status: normative design; implementation starts in commit 2. Defaults marked **initial** are
-expected to be tuned against a real application but may not be silently changed: a change requires
-an ADR and a docs update.
+Status: normative design. The v0 cooperative implementation covers budget, yielding,
+`werk.task`, `werk.effect`, ingestion, cancellation, and determinate/indeterminate progress refs.
+Worker transport, backpressure, route scopes, visibility, and adaptive sizing are not implemented
+yet. Defaults marked **initial** may be tuned against a real application but may not be silently
+changed: a change requires an ADR and a docs update.
 
 The key words MUST, MUST NOT, SHOULD, and MAY are used in the RFC 2119 sense.
 
@@ -122,10 +124,9 @@ Progress is a declared capability, not a universal promise.
 - Adaptation MUST be per task and MUST NOT be driven by unrelated long tasks elsewhere on the
   page.
 
-## 10. Required public surface (reserved)
+## 10. Public surface (v0)
 
-These names are reserved for the runtime commit. Exact signatures are fixed when implemented; the
-behavior above is normative now.
+The cooperative backend implements these names:
 
 - `werk.task` — task handle with data/pending/error/status refs and `run`/`cancel`
 - `werk.effect` → `{ cancel, done }`
@@ -138,8 +139,11 @@ Rules for the surface:
 - No async `computed` export, ever.
 - Data is published with `shallowRef`; the async boundary is visible.
 - Task handles MUST be cancelable by Vue scope disposal when created inside a component scope.
-- No hidden global scheduler in tests: a factory (`createWerk`) MUST exist for isolated tests and
-  custom clocks.
+- No hidden global scheduler in tests: `createWerk` exists for isolated tests and custom clocks.
+
+Not implemented in v0: worker backend and worker crash recovery, SharedArrayBuffer/coalesced/stream
+transports, credit/ack backpressure, route/session scopes, visibility suspension, and adaptive
+chunk sizing.
 
 ## 11. Not specified in v1
 

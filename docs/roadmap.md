@@ -5,16 +5,17 @@ previous one shipped — they start when the previous one is proven in a real ap
 
 ## Phase 1 — Core runtime walking skeleton
 
-**Status: next commit.**
+**Status: in progress.** The cooperative runtime and sandbox have landed. Real-app validation and
+browser-specific scheduler tests remain.
 
-- Budget scheduler with a configurable `budgetMs` (default 5 ms).
-- Cooperative yielding with `scheduler.yield` / `scheduler.postTask` fallbacks.
-- `werk.effect`, `werk.task`, `werk.ingest`.
-- Explicit async boundary: `shallowRef` data plus pending/error/status.
-- Cancellation semantics, including late-chunk discard.
-- Test injection for clock and yield adapter.
-- One browser playground that demonstrates a heavy list operation without blocking the frame for
-  the whole operation.
+- Budget scheduler with a configurable `budgetMs` (default 5 ms). **Landed.**
+- Cooperative yielding with `scheduler.yield` / `scheduler.postTask` fallbacks. **Landed.**
+- `werk.effect`, `werk.task`, `werk.ingest`. **Landed.**
+- Explicit async boundary: `shallowRef` data plus pending/error/status/progress. **Landed.**
+- Cancellation semantics, including late-chunk discard. **Landed.**
+- Test injection for clock and yield adapter. **Landed.**
+- Sandbox with a heavy fuzzy search and budgeted ingestion. **Landed.**
+- Browser-level scheduler fallback tests and a production-style app case. **Remaining.**
 
 **Exit criteria:** one real compute-heavy app uses it; no werk-managed slice intentionally exceeds
 the budget; tests cover budget, yield fallbacks, cancellation, and ingestion.
