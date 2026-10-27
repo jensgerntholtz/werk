@@ -1,5 +1,9 @@
 # Werk
 
+THIS REPO IS STILL IN DRAFT
+
+__________________________________
+
 [![CI](https://github.com/jensgerntholtz/werk/actions/workflows/ci.yml/badge.svg)](https://github.com/jensgerntholtz/werk/actions/workflows/ci.yml)
 
 **Werk is a frame budgeter for large client-rendered Vue applications.**
